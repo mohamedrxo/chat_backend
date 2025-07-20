@@ -1,37 +1,44 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-
+const express =  require('express');
 const app = express();
+const http =  require('http');
+const {Server} = require('socket.io');
+const cors  = require("cors")
+
+app.use(cors())
+
 const server = http.createServer(app);
+const allowedOrigins = ["http://localhost:5173"];
+
 const io = new Server(server, {
   cors: {
-    origin: "*", // Allow any origin
-    methods: ["GET", "POST"]
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods: ["GET", "POST"],
+    credentials: true // Only needed if you're using cookies/auth
   }
 });
 
-// Simple route
-app.get("/", (req, res) => {
-  res.send("WebSocket server running.");
-});
+io.on("connection",(socket)=>{
+  console.log("user connected",socket.id)
+  
+  socket.on("sendMessage",(data)=>{
+    console.log(data.room,data.message)
+    socket.to(data.room).emit("receiveMessage",data.message)
+  })
+  socket.on("joinRoom",(data)=>{
+    console.log(data)
+    socket.join(data)
+  })
+  socket.on("leaveRoom",data=>{
+    socket.leave(data)
+  })
+})
 
-// Socket.io events
-io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
-
-  socket.on("message", (msg) => {
-    console.log("Message received:", msg);
-    io.emit("message", msg); // broadcast to all clients
-  });
-
-  socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
-  });
-});
-
-// Start server
-const PORT = 3000;
-server.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
+server.listen(3000,()=>{
+  console.log("server is running on port 3000")
+})
